@@ -5,13 +5,17 @@ package.domain = com.meoe
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,ttf
 version = 1.0
-requirements = python3,kivy==2.2.1,numpy,androidstorage4kivy
+
+# android is listed before androidstorage4kivy — required dependency order
+requirements = python3,kivy==2.2.1,android,androidstorage4kivy,numpy
+
 orientation = landscape
 fullscreen = 0
+
 android.permissions = SYSTEM_ALERT_WINDOW,FOREGROUND_SERVICE,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,INTERNET
 android.api = 33
 android.minapi = 21
-android.sdk = 33
+# android.sdk is REMOVED — deprecated, was causing the yellow warning in CI logs
 android.ndk = 25b
 android.archs = arm64-v8a
 android.allow_backup = true
