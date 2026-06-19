@@ -13,13 +13,13 @@ android.api = 33
 android.minapi = 21
 android.sdk = 33
 android.ndk = 25b
-android.archs = arm64-v8a,armeabi-v7a
+android.archs = arm64-v8a
 android.allow_backup = true
 android.meta_data = android.permission.SYSTEM_ALERT_WINDOW=true
 android.skip_update = True
 android.no-compile-pyo = True
+android.build_tools = 33.0.0
 
 [buildozer]
 log_level = 2
 warn_on_root = 0
-
