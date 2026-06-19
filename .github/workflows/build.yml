@@ -1,4 +1,5 @@
 name: Build MEOE APK
+
 on:
   push:
     branches: [main, master]
@@ -34,7 +35,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildozer-
 
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -50,6 +51,18 @@ jobs:
             libssl-dev autoconf automake \
             libtool pkg-config
 
+      - name: Install Android SDK command line tools
+        run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip
+          mv cmdline-tools latest
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
@@ -57,6 +70,8 @@ jobs:
 
       - name: Build APK
         run: |
+          export ANDROID_HOME=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/33.0.0
           buildozer android debug
         timeout-minutes: 120
 
@@ -66,6 +81,7 @@ jobs:
           name: meoe-apk
           path: bin/*.apk
           retention-days: 30
+
       - name: Create Release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -75,7 +91,7 @@ jobs:
           name: MEOE Build ${{ github.run_number }}
           body: |
             Автосборка MEOE Overlay для Android
-      
+            
             Установка:
             1. Скачай APK из раздела Assets
             2. Разреши установку из неизвестных источников
