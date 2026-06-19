@@ -85,4 +85,3 @@ jobs:
             4. Предоставь разрешение "Поверх других приложений"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
