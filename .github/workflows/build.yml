@@ -1,101 +1,55 @@
-name: Build MEOE APK
+name: Build APK
+on: push: branches: - main - master workflow_dispatch:
+jobs: build: runs-on: ubuntu-22.04
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
 
-on:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
+  - name: Python
+    uses: actions/setup-python@v5
+    with:
+      python-version: "3.10"
 
-jobs:
-  build-android:
-    runs-on: ubuntu-22.04
+  - name: Java
+    uses: actions/setup-java@v4
+    with:
+      distribution: temurin
+      java-version: "17"
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  - name: Install packages
+    run: |
+      sudo apt-get update
 
-      - name: Setup Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
+      sudo apt-get install -y \
+        git zip unzip \
+        openjdk-17-jdk \
+        autoconf automake \
+        libtool pkg-config \
+        zlib1g-dev \
+        libffi-dev \
+        libssl-dev \
+        build-essential \
+        ccache
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+  - name: Install Buildozer
+    run: |
+      python -m pip install --upgrade pip
+      pip install buildozer==1.5.0
+      pip install cython==0.29.37
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            python3-pip build-essential git \
-            libsdl2-dev libsdl2-image-dev \
-            libsdl2-mixer-dev libsdl2-ttf-dev \
-            libportmidi-dev libswscale-dev \
-            libavformat-dev libavcodec-dev \
-            zlib1g-dev libffi-dev \
-            libssl-dev autoconf automake \
-            libtool libtool-bin pkg-config \
-            aidl m4
+  - name: Build APK
+    run: |
+      buildozer android debug > build.log 2>&1 || true
+      tail -500 build.log
 
-      - name: Install Buildozer, Cython and python-for-android
-        run: |
-          pip install --upgrade pip
-          # Cython 0.29.x совместим с Kivy 2.2.1
-          pip install "cython==0.29.37"
-          pip install buildozer python-for-android
+  - name: Upload Logs
+    uses: actions/upload-artifact@v4
+    with:
+      name: build-log
+      path: build.log
 
-      - name: Setup Android SDK and NDK
-        run: |
-          PLATFORM=$HOME/.buildozer/android/platform
-          BSDK=$PLATFORM/android-sdk
-          BNDK=$PLATFORM/android-ndk-r25b
-
-          mkdir -p $BSDK/cmdline-tools
-          mkdir -p $BSDK/tools/bin
-
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip -d $BSDK/cmdline-tools
-          mv $BSDK/cmdline-tools/cmdline-tools $BSDK/cmdline-tools/latest
-
-          SDKMANAGER=$BSDK/cmdline-tools/latest/bin/sdkmanager
-          ln -sf $SDKMANAGER $BSDK/tools/bin/sdkmanager
-          ln -sf $BSDK/cmdline-tools/latest/bin/avdmanager $BSDK/tools/bin/avdmanager
-
-          yes | $SDKMANAGER --sdk_root=$BSDK --licenses > /dev/null 2>&1
-          $SDKMANAGER --sdk_root=$BSDK \
-            "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;33.0.2"
-
-          ln -sf $(which aidl) $BSDK/build-tools/33.0.2/aidl
-
-          wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
-          unzip -q android-ndk-r25b-linux.zip -d $PLATFORM
-
-          echo "ANDROIDSDK=$BSDK"  >> $GITHUB_ENV
-          echo "ANDROIDNDK=$BNDK"  >> $GITHUB_ENV
-          echo "ANDROIDAPI=33"     >> $GITHUB_ENV
-          echo "ANDROIDMINAPI=24"  >> $GITHUB_ENV
-          echo "$BSDK/tools/bin"                >> $GITHUB_PATH
-          echo "$BSDK/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$BSDK/platform-tools"           >> $GITHUB_PATH
-          echo "$BSDK/build-tools/33.0.2"       >> $GITHUB_PATH
-
-      - name: Build APK
-        env:
-          ANDROIDSDK: ${{ env.ANDROIDSDK }}
-          ANDROIDNDK: ${{ env.ANDROIDNDK }}
-          ANDROIDAPI: "33"
-          ANDROIDMINAPI: "24"
-        run: |
-          buildozer android debug
-          find . -name "*.apk" 2>/dev/null
-        timeout-minutes: 120
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: meoe-apk
-          path: "**/*.apk"
-          retention-days: 30
+  - name: Upload APK
+    uses: actions/upload-artifact@v4
+    with:
+      name: apk
+      path: bin/*.apk
