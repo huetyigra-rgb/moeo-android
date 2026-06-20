@@ -38,36 +38,30 @@ jobs:
             gstreamer1.0-plugins-good \
             libsqlite3-dev libffi-dev \
             libssl-dev autoconf automake \
-            libtool pkg-config
- 
-      - name: Setup Android SDK
-        run: |
-          ANDROID_HOME_DIR=$HOME/android-sdk
-          mkdir -p $ANDROID_HOME_DIR/cmdline-tools
-          cd $ANDROID_HOME_DIR/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip
-          mv cmdline-tools latest
- 
-          # Persist ANDROID_HOME and PATH to ALL subsequent steps
-          echo "ANDROID_HOME=$ANDROID_HOME_DIR" >> $GITHUB_ENV
-          echo "$ANDROID_HOME_DIR/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME_DIR/platform-tools"           >> $GITHUB_PATH
-          echo "$ANDROID_HOME_DIR/build-tools/33.0.2"       >> $GITHUB_PATH
- 
-          # Accept licences and install required SDK components
-          export PATH=$PATH:$ANDROID_HOME_DIR/cmdline-tools/latest/bin
-          yes | sdkmanager --licenses > /dev/null 2>&1
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;33.0.2" \
-            "ndk;25.2.9519653"
+            libtool pkg-config \
+            aidl
  
       - name: Install Buildozer and Cython
         run: |
           pip install --upgrade pip
           pip install buildozer cython
+ 
+      - name: Prepare Buildozer SDK cache
+        run: |
+          # Buildozer downloads its own SDK to ~/.buildozer/android/platform/android-sdk
+          # We pre-create the build-tools folder so aidl (installed via apt) is found there
+          BSDK=$HOME/.buildozer/android/platform/android-sdk
+          mkdir -p $BSDK/build-tools/33.0.2
+          mkdir -p $BSDK/platform-tools
+          mkdir -p $BSDK/platforms/android-33
+ 
+          # Symlink the system aidl into Buildozer's expected build-tools path
+          AIDL_PATH=$(which aidl)
+          ln -sf $AIDL_PATH $BSDK/build-tools/33.0.2/aidl
+ 
+          # Also export ANDROIDSDK so Buildozer knows to use this path
+          echo "ANDROIDSDK=$BSDK"      >> $GITHUB_ENV
+          echo "ANDROIDNDK_PATH=$HOME/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
  
       - name: Build APK
         run: |
