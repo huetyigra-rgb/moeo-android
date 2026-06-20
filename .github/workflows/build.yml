@@ -93,20 +93,14 @@ jobs:
           ANDROIDAPI: "33"
           ANDROIDMINAPI: "24"
         run: |
-          buildozer android debug 2>&1 | tee /tmp/buildozer.log
+          buildozer android debug
+          echo "=== Ищем APK ==="
+          find . -name "*.apk" 2>/dev/null
         timeout-minutes: 120
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: meoe-apk
-          path: bin/*.apk
+          path: "**/*.apk"
           retention-days: 30
-
-      - name: Upload build log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/buildozer.log
-          retention-days: 7
