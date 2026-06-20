@@ -7,7 +7,8 @@ on:
 
 jobs:
   build-android:
-    runs-on: ubuntu-latest
+    # Ubuntu 22.04 — autoconf совместим с libffi из python-for-android
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout repository
@@ -38,11 +39,8 @@ jobs:
             gstreamer1.0-plugins-good \
             libsqlite3-dev libffi-dev \
             libssl-dev autoconf automake \
-            libtool pkg-config \
-            aidl \
-            libtool-bin \
-            m4 \
-            autoconf-archive
+            libtool libtool-bin pkg-config \
+            aidl m4
 
       - name: Install Buildozer, Cython and python-for-android
         run: |
@@ -94,7 +92,6 @@ jobs:
           ANDROIDMINAPI: "24"
         run: |
           buildozer android debug
-          echo "=== Ищем APK ==="
           find . -name "*.apk" 2>/dev/null
         timeout-minutes: 120
 
