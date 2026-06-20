@@ -41,10 +41,10 @@ jobs:
             libtool pkg-config \
             aidl
 
-      - name: Install Buildozer and Cython
+      - name: Install Buildozer, Cython and python-for-android
         run: |
           pip install --upgrade pip
-          pip install buildozer cython
+          pip install buildozer cython python-for-android
 
       - name: Setup Android SDK and NDK
         run: |
@@ -83,16 +83,8 @@ jobs:
           echo "$BSDK/platform-tools"           >> $GITHUB_PATH
           echo "$BSDK/build-tools/33.0.2"       >> $GITHUB_PATH
 
-      - name: Build APK
-        env:
-          ANDROIDSDK: ${{ env.ANDROIDSDK }}
-          ANDROIDNDK: ${{ env.ANDROIDNDK }}
-          ANDROIDAPI: "33"
-          ANDROIDMINAPI: "24"
-          # Максимальный уровень логов чтобы увидеть реальную ошибку
-          P4A_RELEASE_KEYALIAS: ""
+      - name: Debug p4a directly
         run: |
-          # Запускаем p4a напрямую чтобы увидеть полный вывод ошибки
           python -m pythonforandroid.toolchain create \
             --dist-name=meoe \
             --bootstrap=sdl2 \
@@ -102,16 +94,18 @@ jobs:
             --ndk-dir=$ANDROIDNDK \
             --ndk-api=24 \
             --android-api=33 \
-            --debug \
-            2>&1 | tee /tmp/p4a_full.log || true
-
-          echo "=== ПОСЛЕДНИЕ 50 СТРОК ЛОГА ==="
-          tail -50 /tmp/p4a_full.log
+            --debug 2>&1 | tee /tmp/p4a_full.log || true
 
           echo "=== ВСЕ ОШИБКИ ==="
-          grep -i "error\|exception\|traceback\|failed" /tmp/p4a_full.log | tail -30
+          grep -i "\[error\]\|traceback\|exception\|failed\|cannot" /tmp/p4a_full.log | tail -40
 
-          # Теперь нормальный buildozer
+      - name: Build APK
+        env:
+          ANDROIDSDK: ${{ env.ANDROIDSDK }}
+          ANDROIDNDK: ${{ env.ANDROIDNDK }}
+          ANDROIDAPI: "33"
+          ANDROIDMINAPI: "24"
+        run: |
           buildozer android debug
         timeout-minutes: 120
 
@@ -122,7 +116,7 @@ jobs:
           path: bin/*.apk
           retention-days: 30
 
-      - name: Upload full p4a log on failure
+      - name: Upload p4a log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
