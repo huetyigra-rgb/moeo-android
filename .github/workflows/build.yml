@@ -55,50 +55,63 @@ jobs:
           mkdir -p $BSDK/cmdline-tools
           mkdir -p $BSDK/tools/bin
 
-          # Download and install cmdline-tools
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
           unzip -q commandlinetools-linux-9477386_latest.zip -d $BSDK/cmdline-tools
           mv $BSDK/cmdline-tools/cmdline-tools $BSDK/cmdline-tools/latest
 
           SDKMANAGER=$BSDK/cmdline-tools/latest/bin/sdkmanager
-
-          # Symlink to legacy path Buildozer hardcodes
-          ln -sf $SDKMANAGER          $BSDK/tools/bin/sdkmanager
+          ln -sf $SDKMANAGER $BSDK/tools/bin/sdkmanager
           ln -sf $BSDK/cmdline-tools/latest/bin/avdmanager $BSDK/tools/bin/avdmanager
 
-          # Accept licences and install SDK components
           yes | $SDKMANAGER --sdk_root=$BSDK --licenses > /dev/null 2>&1
           $SDKMANAGER --sdk_root=$BSDK \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2"
 
-          # Symlink system aidl into build-tools
           ln -sf $(which aidl) $BSDK/build-tools/33.0.2/aidl
 
-          # Download NDK r25b (exact version Buildozer expects)
           wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
           unzip -q android-ndk-r25b-linux.zip -d $PLATFORM
-          # Buildozer expects exactly this folder name:
-          ls $PLATFORM/
 
-          # Tell Buildozer to use OUR SDK/NDK — must be set before buildozer runs
           echo "ANDROIDSDK=$BSDK"  >> $GITHUB_ENV
           echo "ANDROIDNDK=$BNDK"  >> $GITHUB_ENV
           echo "ANDROIDAPI=33"     >> $GITHUB_ENV
-          echo "ANDROIDMINAPI=21"  >> $GITHUB_ENV
-          echo "$BSDK/tools/bin"           >> $GITHUB_PATH
+          echo "ANDROIDMINAPI=24"  >> $GITHUB_ENV
+          echo "$BSDK/tools/bin"                >> $GITHUB_PATH
           echo "$BSDK/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$BSDK/platform-tools"      >> $GITHUB_PATH
-          echo "$BSDK/build-tools/33.0.2"  >> $GITHUB_PATH
+          echo "$BSDK/platform-tools"           >> $GITHUB_PATH
+          echo "$BSDK/build-tools/33.0.2"       >> $GITHUB_PATH
 
       - name: Build APK
         env:
           ANDROIDSDK: ${{ env.ANDROIDSDK }}
           ANDROIDNDK: ${{ env.ANDROIDNDK }}
           ANDROIDAPI: "33"
-          ANDROIDMINAPI: "21"
+          ANDROIDMINAPI: "24"
+          # Максимальный уровень логов чтобы увидеть реальную ошибку
+          P4A_RELEASE_KEYALIAS: ""
         run: |
+          # Запускаем p4a напрямую чтобы увидеть полный вывод ошибки
+          python -m pythonforandroid.toolchain create \
+            --dist-name=meoe \
+            --bootstrap=sdl2 \
+            --requirements=python3,kivy==2.2.1,android,androidstorage4kivy,numpy \
+            --arch=arm64-v8a \
+            --sdk-dir=$ANDROIDSDK \
+            --ndk-dir=$ANDROIDNDK \
+            --ndk-api=24 \
+            --android-api=33 \
+            --debug \
+            2>&1 | tee /tmp/p4a_full.log || true
+
+          echo "=== ПОСЛЕДНИЕ 50 СТРОК ЛОГА ==="
+          tail -50 /tmp/p4a_full.log
+
+          echo "=== ВСЕ ОШИБКИ ==="
+          grep -i "error\|exception\|traceback\|failed" /tmp/p4a_full.log | tail -30
+
+          # Теперь нормальный buildozer
           buildozer android debug
         timeout-minutes: 120
 
@@ -108,3 +121,11 @@ jobs:
           name: meoe-apk
           path: bin/*.apk
           retention-days: 30
+
+      - name: Upload full p4a log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p4a-debug-log
+          path: /tmp/p4a_full.log
+          retention-days: 7
