@@ -1,82 +1,27 @@
-name: Build MEOE APK
+[app]
+title = MEOE Overlay
+package.name = meoe
+package.domain = com.meoe
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas,json,ttf
+version = 1.0
 
-on:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
+# numpy убран — не компилируется с NDK r25b
+# используем чистый Python для математики
+requirements = python3,kivy==2.2.1,android,androidstorage4kivy
 
-jobs:
-  build-android:
-    runs-on: ubuntu-latest
+orientation = landscape
+fullscreen = 0
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+android.permissions = SYSTEM_ALERT_WINDOW,FOREGROUND_SERVICE,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,INTERNET
+android.api = 33
+android.minapi = 24
+android.ndk = 25b
+android.archs = arm64-v8a
+android.allow_backup = true
+android.meta_data = android.permission.SYSTEM_ALERT_WINDOW=true
+android.no-compile-pyo = True
 
-      - name: Setup Python 3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            python3-pip build-essential git \
-            ffmpeg libsdl2-dev libsdl2-image-dev \
-            libsdl2-mixer-dev libsdl2-ttf-dev \
-            libportmidi-dev libswscale-dev \
-            libavformat-dev libavcodec-dev \
-            zlib1g-dev libgstreamer1.0 \
-            gstreamer1.0-plugins-base \
-            gstreamer1.0-plugins-good \
-            libsqlite3-dev libffi-dev \
-            libssl-dev autoconf automake \
-            libtool pkg-config
-
-      - name: Setup Android SDK
-        run: |
-          ANDROID_HOME_DIR=$HOME/android-sdk
-          mkdir -p $ANDROID_HOME_DIR/cmdline-tools
-          cd $ANDROID_HOME_DIR/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip
-          mv cmdline-tools latest
-
-          # Persist ANDROID_HOME and PATH to ALL subsequent steps
-          echo "ANDROID_HOME=$ANDROID_HOME_DIR" >> $GITHUB_ENV
-          echo "$ANDROID_HOME_DIR/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$ANDROID_HOME_DIR/platform-tools"           >> $GITHUB_PATH
-          echo "$ANDROID_HOME_DIR/build-tools/33.0.2"       >> $GITHUB_PATH
-
-          # Accept licences and install required SDK components
-          export PATH=$PATH:$ANDROID_HOME_DIR/cmdline-tools/latest/bin
-          yes | sdkmanager --licenses > /dev/null 2>&1
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;33.0.2" \
-            "ndk;25.2.9519653"
-
-      - name: Install Buildozer and Cython
-        run: |
-          pip install --upgrade pip
-          pip install buildozer cython
-
-      - name: Build APK
-        run: |
-          buildozer android debug
-        timeout-minutes: 120
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: meoe-apk
-          path: bin/*.apk
-          retention-days: 30
+[buildozer]
+log_level = 2
+warn_on_root = 0
