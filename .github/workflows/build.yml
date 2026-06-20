@@ -41,7 +41,9 @@ jobs:
       - name: Install Buildozer, Cython and python-for-android
         run: |
           pip install --upgrade pip
-          pip install buildozer cython python-for-android
+          # Cython 0.29.x совместим с Kivy 2.2.1
+          pip install "cython==0.29.37"
+          pip install buildozer python-for-android
 
       - name: Setup Android SDK and NDK
         run: |
