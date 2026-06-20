@@ -39,7 +39,10 @@ jobs:
             libsqlite3-dev libffi-dev \
             libssl-dev autoconf automake \
             libtool pkg-config \
-            aidl
+            aidl \
+            libtool-bin \
+            m4 \
+            autoconf-archive
 
       - name: Install Buildozer, Cython and python-for-android
         run: |
@@ -83,22 +86,6 @@ jobs:
           echo "$BSDK/platform-tools"           >> $GITHUB_PATH
           echo "$BSDK/build-tools/33.0.2"       >> $GITHUB_PATH
 
-      - name: Debug p4a directly
-        run: |
-          python -m pythonforandroid.toolchain create \
-            --dist-name=meoe \
-            --bootstrap=sdl2 \
-            --requirements=python3,kivy==2.2.1,android,androidstorage4kivy,numpy \
-            --arch=arm64-v8a \
-            --sdk-dir=$ANDROIDSDK \
-            --ndk-dir=$ANDROIDNDK \
-            --ndk-api=24 \
-            --android-api=33 \
-            --debug 2>&1 | tee /tmp/p4a_full.log || true
-
-          echo "=== ВСЕ ОШИБКИ ==="
-          grep -i "\[error\]\|traceback\|exception\|failed\|cannot" /tmp/p4a_full.log | tail -40
-
       - name: Build APK
         env:
           ANDROIDSDK: ${{ env.ANDROIDSDK }}
@@ -106,7 +93,7 @@ jobs:
           ANDROIDAPI: "33"
           ANDROIDMINAPI: "24"
         run: |
-          buildozer android debug
+          buildozer android debug 2>&1 | tee /tmp/buildozer.log
         timeout-minutes: 120
 
       - name: Upload APK artifact
@@ -116,10 +103,10 @@ jobs:
           path: bin/*.apk
           retention-days: 30
 
-      - name: Upload p4a log on failure
+      - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: p4a-debug-log
-          path: /tmp/p4a_full.log
+          name: build-log
+          path: /tmp/buildozer.log
           retention-days: 7
