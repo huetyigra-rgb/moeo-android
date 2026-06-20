@@ -13,7 +13,7 @@ fullscreen = 0
 
 android.permissions = SYSTEM_ALERT_WINDOW,FOREGROUND_SERVICE,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,INTERNET
 android.api = 33
-android.minapi = 21
+android.minapi = 24
 android.ndk = 25b
 android.archs = arm64-v8a
 android.allow_backup = true
