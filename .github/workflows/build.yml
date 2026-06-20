@@ -46,22 +46,32 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython
  
-      - name: Prepare Buildozer SDK cache
+      - name: Setup Buildozer SDK (cmdline-tools + sdkmanager)
         run: |
-          # Buildozer downloads its own SDK to ~/.buildozer/android/platform/android-sdk
-          # We pre-create the build-tools folder so aidl (installed via apt) is found there
           BSDK=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $BSDK/build-tools/33.0.2
-          mkdir -p $BSDK/platform-tools
-          mkdir -p $BSDK/platforms/android-33
+          mkdir -p $BSDK/cmdline-tools
  
-          # Symlink the system aidl into Buildozer's expected build-tools path
-          AIDL_PATH=$(which aidl)
-          ln -sf $AIDL_PATH $BSDK/build-tools/33.0.2/aidl
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip -d $BSDK/cmdline-tools
+          mv $BSDK/cmdline-tools/cmdline-tools $BSDK/cmdline-tools/latest
  
-          # Also export ANDROIDSDK so Buildozer knows to use this path
-          echo "ANDROIDSDK=$BSDK"      >> $GITHUB_ENV
-          echo "ANDROIDNDK_PATH=$HOME/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
+          export PATH=$PATH:$BSDK/cmdline-tools/latest/bin
+ 
+          # Accept licences and install everything Buildozer needs
+          yes | sdkmanager --sdk_root=$BSDK --licenses > /dev/null 2>&1
+          sdkmanager --sdk_root=$BSDK \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2"
+ 
+          # Symlink system aidl into Buildozer's build-tools path
+          ln -sf $(which aidl) $BSDK/build-tools/33.0.2/aidl
+ 
+          # Persist to subsequent steps
+          echo "ANDROIDSDK=$BSDK" >> $GITHUB_ENV
+          echo "$BSDK/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$BSDK/platform-tools"           >> $GITHUB_PATH
+          echo "$BSDK/build-tools/33.0.2"       >> $GITHUB_PATH
  
       - name: Build APK
         run: |
