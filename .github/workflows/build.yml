@@ -1,29 +1,29 @@
 name: Build MEOE APK
- 
+
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
- 
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
- 
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
- 
+
       - name: Setup Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
- 
+
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
- 
+
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
@@ -40,44 +40,68 @@ jobs:
             libssl-dev autoconf automake \
             libtool pkg-config \
             aidl
- 
+
       - name: Install Buildozer and Cython
         run: |
           pip install --upgrade pip
           pip install buildozer cython
- 
-      - name: Setup Buildozer SDK (cmdline-tools + sdkmanager)
+
+      - name: Setup Android SDK and NDK
         run: |
-          BSDK=$HOME/.buildozer/android/platform/android-sdk
+          PLATFORM=$HOME/.buildozer/android/platform
+          BSDK=$PLATFORM/android-sdk
+          BNDK=$PLATFORM/android-ndk-r25b
+
           mkdir -p $BSDK/cmdline-tools
- 
+          mkdir -p $BSDK/tools/bin
+
+          # Download and install cmdline-tools
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
           unzip -q commandlinetools-linux-9477386_latest.zip -d $BSDK/cmdline-tools
           mv $BSDK/cmdline-tools/cmdline-tools $BSDK/cmdline-tools/latest
- 
-          export PATH=$PATH:$BSDK/cmdline-tools/latest/bin
- 
-          # Accept licences and install everything Buildozer needs
-          yes | sdkmanager --sdk_root=$BSDK --licenses > /dev/null 2>&1
-          sdkmanager --sdk_root=$BSDK \
+
+          SDKMANAGER=$BSDK/cmdline-tools/latest/bin/sdkmanager
+
+          # Symlink to legacy path Buildozer hardcodes
+          ln -sf $SDKMANAGER          $BSDK/tools/bin/sdkmanager
+          ln -sf $BSDK/cmdline-tools/latest/bin/avdmanager $BSDK/tools/bin/avdmanager
+
+          # Accept licences and install SDK components
+          yes | $SDKMANAGER --sdk_root=$BSDK --licenses > /dev/null 2>&1
+          $SDKMANAGER --sdk_root=$BSDK \
             "platform-tools" \
             "platforms;android-33" \
             "build-tools;33.0.2"
- 
-          # Symlink system aidl into Buildozer's build-tools path
+
+          # Symlink system aidl into build-tools
           ln -sf $(which aidl) $BSDK/build-tools/33.0.2/aidl
- 
-          # Persist to subsequent steps
-          echo "ANDROIDSDK=$BSDK" >> $GITHUB_ENV
+
+          # Download NDK r25b (exact version Buildozer expects)
+          wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
+          unzip -q android-ndk-r25b-linux.zip -d $PLATFORM
+          # Buildozer expects exactly this folder name:
+          ls $PLATFORM/
+
+          # Tell Buildozer to use OUR SDK/NDK — must be set before buildozer runs
+          echo "ANDROIDSDK=$BSDK"  >> $GITHUB_ENV
+          echo "ANDROIDNDK=$BNDK"  >> $GITHUB_ENV
+          echo "ANDROIDAPI=33"     >> $GITHUB_ENV
+          echo "ANDROIDMINAPI=21"  >> $GITHUB_ENV
+          echo "$BSDK/tools/bin"           >> $GITHUB_PATH
           echo "$BSDK/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$BSDK/platform-tools"           >> $GITHUB_PATH
-          echo "$BSDK/build-tools/33.0.2"       >> $GITHUB_PATH
- 
+          echo "$BSDK/platform-tools"      >> $GITHUB_PATH
+          echo "$BSDK/build-tools/33.0.2"  >> $GITHUB_PATH
+
       - name: Build APK
+        env:
+          ANDROIDSDK: ${{ env.ANDROIDSDK }}
+          ANDROIDNDK: ${{ env.ANDROIDNDK }}
+          ANDROIDAPI: "33"
+          ANDROIDMINAPI: "21"
         run: |
           buildozer android debug
         timeout-minutes: 120
- 
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
